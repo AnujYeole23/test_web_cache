@@ -39,6 +39,7 @@ dependencies:
   dio: ^5.7.0
   video_player: ^2.5.1
   chewie: ^1.8.5
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
