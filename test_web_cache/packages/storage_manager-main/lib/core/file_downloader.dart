@@ -9,7 +9,7 @@ abstract class FileDownloader {
     String storagePath, {
     Directory? cacheDir,
   }) async {
-    final localFilePath = await LocalFile.getPath(
+    final localFilePath = await LocalFile.instance.getPath(
       storagePath: storagePath,
       cacheDir: cacheDir,
     );
