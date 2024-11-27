@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:path_provider/path_provider.dart';
 import 'package:storage_manager/core/local_file.dart';
 
@@ -16,7 +15,7 @@ class StorageController {
     final downloadDir =
         await LocalFile.instance.getDownloadDirectory(cacheDirectory);
 
-    await downloadDir.list().forEach((element) {
+    await downloadDir?.list().forEach((element) {
       element.deleteSync();
     });
   }
