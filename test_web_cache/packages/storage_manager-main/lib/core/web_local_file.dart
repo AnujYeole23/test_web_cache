@@ -7,27 +7,41 @@ import 'package:universal_io/io.dart';
 class WebLocalFile implements LocalFile {
   @override
   Future<bool> fileExists(String localPath) async {
-    try {
-      print('Checking if file exists at path: $localPath');
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
+  try {
+    print('Checking if file exists at path: $localPath');
 
-      if (directoryHandle == null) {
-        print(
-            'Directory handle is null. File System Access API might not be supported.');
-        return false;
-      }
-
-      final fileHandle = await directoryHandle.getFileHandle(localPath);
-      print(fileHandle != null
-          ? 'File exists: $localPath'
-          : 'File does not exist: $localPath');
-      return fileHandle != null;
-    } catch (e) {
-      print('Error while checking file existence: $e');
+    // Check if File System Access API is supported
+    if (html.window.navigator.storage == null) {
+      print('File System Access API is not supported in this browser.');
       return false;
     }
+
+    // Get the directory handle
+    final directoryHandle = await html.window.navigator.storage?.getDirectory();
+    if (directoryHandle == null) {
+      print(
+          'Directory handle is null. File System Access API might not be supported.');
+      return false;
+    }
+    print('Directory handle successfully retrieved.');
+
+    // Sanitize and escape the file name before using it
+    final sanitizedFileName = Uri.encodeComponent(localPath.trim());
+    print('Sanitized file name: $sanitizedFileName');
+
+    // Attempt to get the file handle
+    await directoryHandle.getFileHandle(sanitizedFileName);
+    print('File exists: $localPath');
+    return true;
+
+  } on NotFoundError {
+    print("File not found: $localPath");
+    return false;
+  } catch (e) {
+    print('Error while checking file existence: $e');
+    return false;
   }
+}
 
   @override
   Future<DateTime?> lastModified(String localPath) async {

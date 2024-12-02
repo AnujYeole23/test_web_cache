@@ -12,8 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_download_manager:
-    git:
-      url: https://github.com/simplecohesion/flutter_download_manager
+    path: ../../packages/flutter_download_manager
       
   path_provider: ^2.0.11
   universal_io: ^2.2.2

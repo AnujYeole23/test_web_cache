@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   dio: ^5.0.2
   collection: ^1.17.1
+  http: ^1.2.2
+  universal_io: ^2.2.2
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
+import 'package:universal_io/io.dart';
 import 'package:collection/collection.dart';
 
 import 'package:dio/dio.dart';
@@ -146,39 +146,60 @@ class DownloadManager {
   }
 
   Future<DownloadTask?> addDownload(String url, String savedDir) async {
+    print("addDownload called with url: $url and savedDir: $savedDir");
+
     if (url.isNotEmpty) {
       if (savedDir.isEmpty) {
+        print("savedDir is empty, defaulting to '.'");
         savedDir = ".";
       }
 
       var isDirectory = await Directory(savedDir).exists();
+      print("Checked if $savedDir is a directory: $isDirectory");
+
       var downloadFilename = isDirectory
           ? savedDir + Platform.pathSeparator + getFileNameFromUrl(url)
           : savedDir;
+      print("Constructed download filename: $downloadFilename");
 
       return _addDownloadRequest(DownloadRequest(url, downloadFilename));
+    } else {
+      print("URL is empty. Returning null.");
+      return null;
     }
   }
 
   Future<DownloadTask> _addDownloadRequest(
-    DownloadRequest downloadRequest,
-  ) async {
+      DownloadRequest downloadRequest) async {
+    print("_addDownloadRequest called with downloadRequest: $downloadRequest");
+
     if (_cache[downloadRequest.url] != null) {
+      print(
+          "Download request already exists in the cache for URL: ${downloadRequest.url}");
+
       if (!_cache[downloadRequest.url]!.status.value.isCompleted &&
           _cache[downloadRequest.url]!.request == downloadRequest) {
-        // Do nothing
+        print(
+            "Existing download is in progress for the same request. Returning cached task.");
         return _cache[downloadRequest.url]!;
       } else {
+        print("Removing completed or mismatched request from queue.");
         _queue.remove(_cache[downloadRequest.url]);
       }
     }
 
+    print("Adding new download request to the queue: ${downloadRequest.url}");
     _queue.add(DownloadRequest(downloadRequest.url, downloadRequest.path));
+
     var task = DownloadTask(_queue.last);
+    print("Created new DownloadTask for URL: ${downloadRequest.url}");
 
     _cache[downloadRequest.url] = task;
+    print(
+        "Updated cache with the new DownloadTask for URL: ${downloadRequest.url}");
 
     _startExecution();
+    print("Execution started for queued downloads.");
 
     return task;
   }
