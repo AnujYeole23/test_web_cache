@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:firebase_storage/firebase_storage.dart' show FirebaseException;
 import 'package:flutter_download_manager/flutter_download_manager.dart';
 import 'package:storage_manager/core/file_downloader.dart';
 import 'package:storage_manager/core/local_file.dart';
 import 'package:storage_manager/enums/storage_file_status.dart';
 import 'package:storage_manager/models/storage_file_snapshot.dart';
+import 'package:universal_io/io.dart';
 
 class StorageFileController {
   StorageFileController({

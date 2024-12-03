@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:storage_manager/core/local_file.dart';
+import 'package:universal_io/io.dart';
 
 class StorageController {
   factory StorageController() {

@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter_download_manager/flutter_download_manager.dart';
 import 'package:storage_manager/core/local_file.dart';
+import 'package:universal_io/io.dart';
 
 /// Abstract class to download files and manage paths
 abstract class FileDownloader {
@@ -38,16 +37,14 @@ abstract class FileDownloader {
 
       // Initialize download manager with a maximum of 4 concurrent tasks
       final dl = DownloadManager(maxConcurrentTasks: 4);
-
       // Add the download task
       final downloadTask = dl.addDownload(url, localFilePath);
-
       if (downloadTask == null) {
         print('Failed to add download task.');
         return null;
       }
 
-      // print('Download task added successfully: ${await downloadTask} ');
+      print('Download task added successfully: ${await downloadTask} ');
       return downloadTask;
 
     } catch (e) {
