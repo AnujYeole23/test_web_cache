@@ -19,8 +19,8 @@ class MyApp extends StatelessWidget {
             title: const Text('Video Player Demo'),
           ),
           body: StorageFileBuilder(storagePath: storagePath,builder: (context, snapshot) {
-            return const VideoPlayerScreen(videoUrl: storagePath);
-          })),
+            return const  VideoPlayerScreen(videoUrl: storagePath);
+          },updateDate:(DateTime.now()),),),
     );
   }
 }

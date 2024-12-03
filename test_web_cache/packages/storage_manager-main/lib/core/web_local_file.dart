@@ -65,27 +65,41 @@ class WebLocalFile implements LocalFile {
     }
   }
 
-  @override
-  Future<String> getPath({
-    required String storagePath,
-    Directory? cacheDir,
-  }) async {
-    try {
-      print('Resolving path for storagePath: $storagePath');
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
+@override
+Future<String> getPath({
+  required String storagePath,
+  Directory? cacheDir,
+}) async {
+  try {
+    print('Resolving path for storagePath: $storagePath');
 
-      if (directoryHandle == null) {
-        throw UnsupportedError('File System Access API is not supported.');
-      }
+    // Extract the file name from the URL
+    final fileName = storagePath.split('/').last;
+    print('Extracted file name: $fileName');
 
-      print('Resolved path: $storagePath');
-      return storagePath;
-    } catch (e) {
-      print('Error resolving path for storagePath: $e');
-      return '';
+    // Request directory access from the user
+    final directoryHandle =
+        await html.window.navigator.storage?.getDirectory();
+
+    if (directoryHandle == null) {
+      throw UnsupportedError('File System Access API is not supported.');
     }
+
+    // Try to get the file handle, creating the file if it doesn't exist
+    final fileHandle = await directoryHandle.getFileHandle(
+      fileName,
+      create: true, // Create the file if it doesn't exist
+    );
+    print('File handle retrieved or created: ${fileHandle.name}');
+
+    // Return the file name or construct a full path if needed
+    return fileName;
+  } catch (e) {
+    print('Error resolving path for storagePath: $e');
+    return '';
   }
+}
+
 
   @override
   Future<Directory> getDownloadDirectory(Directory cacheDir) async {
