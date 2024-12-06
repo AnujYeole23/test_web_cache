@@ -185,11 +185,9 @@ packages:
   flutter_download_manager:
     dependency: "direct main"
     description:
-      path: "."
-      ref: HEAD
-      resolved-ref: "629cfe58d25ceb38da335f538f33d1809c5f2759"
-      url: "https://github.com/simplecohesion/flutter_download_manager"
-    source: git
+      path: "../../packages/flutter_download_manager"
+      relative: true
+    source: path
     version: "0.5.6"
   flutter_lints:
     dependency: "direct dev"

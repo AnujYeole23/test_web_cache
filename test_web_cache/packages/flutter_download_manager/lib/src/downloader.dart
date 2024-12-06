@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:universal_io/io.dart';
 import 'package:collection/collection.dart';
+import 'dart:html' as html;
+import 'dart:typed_data'; // For working with Uint8List, if needed
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -44,87 +48,113 @@ class DownloadManager {
         if (total == -1) {}
       };
 
-  Future<void> download(String url, String savePath, cancelToken,
-      {forceDownload = false}) async {
-    late String partialFilePath;
-    late File partialFile;
-    try {
-      var task = getDownload(url);
+  String extractFileName(String url) {
+    final uri = Uri.parse(url);
+    return uri.pathSegments
+        .last; // Extracts the last part of the path, e.g., 'file_name.mp4'
+  }
 
-      if (task == null || task.status.value == DownloadStatus.canceled) {
+  Future<void> download(String url, String savePath, CancelToken cancelToken,
+      {forceDownload = false}) async {
+    try {
+      print('Download started for URL: $url');
+
+      var task = getDownload(url);
+      if (task == null) {
+        print('No download task found for URL: $url');
         return;
       }
-      setStatus(task, DownloadStatus.downloading);
 
-      if (kDebugMode) {
-        print(url);
+      if (task.status.value == DownloadStatus.canceled) {
+        print('Download canceled for URL: $url');
+        return;
       }
-      var file = File(savePath.toString());
-      partialFilePath = savePath + partialExtension;
-      partialFile = File(partialFilePath);
 
-      var partialFileExist = await partialFile.exists();
+      setStatus(task, DownloadStatus.downloading);
+      print('Download status set to downloading for URL: $url');
 
-      if (partialFileExist) {
-        if (kDebugMode) {
-          print("Partial File Exists");
-        }
-
-        var partialFileLength = await partialFile.length();
-
-        var response = await dio.download(url, partialFilePath + tempExtension,
-            onReceiveProgress: createCallback(url, partialFileLength),
-            options: Options(
-              headers: {HttpHeaders.rangeHeader: 'bytes=$partialFileLength-'},
-            ),
-            cancelToken: cancelToken,
-            deleteOnError: true);
-
-        if (response.statusCode == HttpStatus.partialContent) {
-          var ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
-          var _f = File(partialFilePath + tempExtension);
-          await ioSink.addStream(_f.openRead());
-          await _f.delete();
-          await ioSink.close();
-          await partialFile.rename(savePath);
-
-          setStatus(task, DownloadStatus.completed);
-        }
-      } else {
-        var response = await dio.download(url, partialFilePath,
-            onReceiveProgress: createCallback(url, 0),
-            cancelToken: cancelToken,
-            deleteOnError: false);
+      if (kIsWeb) {
+        print('Running web-specific download logic');
+        final response = await dio.get(
+          url,
+          options: Options(responseType: ResponseType.bytes),
+          cancelToken: cancelToken,
+        );
 
         if (response.statusCode == HttpStatus.ok) {
-          await partialFile.rename(savePath);
+          print('HTTP request succeeded for URL: $url');
+          // Convert file data to Base64
+          final base64Data = base64Encode(response.data);
+          print('File data encoded to Base64 for URL: $url');
+
+          // Create a downloadable data URL
+          final dataUrl = "data:application/octet-stream;base64,$base64Data";
+          final filename = extractFileName(url);
+          // Create an anchor element for downloading
+          final anchor = html.AnchorElement(href: dataUrl)
+            ..target = '_blank'
+            ..download = filename; 
+
+          html.document.body?.append(anchor);
+          print('Anchor element created and appended for URL: $url');
+          anchor.click();
+          print('Download triggered via anchor click for URL: $url');
+          anchor.remove();
+          print('Anchor element removed after click for URL: $url');
+
           setStatus(task, DownloadStatus.completed);
+          print('Download completed for URL: $url');
+        } else {
+          print(
+              'HTTP request failed with status: ${response.statusCode} for URL: $url');
+          setStatus(task, DownloadStatus.failed);
+        }
+      } else {
+        print('Running non-web-specific download logic');
+        final response = await dio.get(
+          url,
+          options: Options(responseType: ResponseType.bytes),
+          cancelToken: cancelToken,
+        );
+
+        if (response.statusCode == HttpStatus.ok) {
+          print('HTTP request succeeded for URL: $url');
+          final file = File(savePath);
+          await file.writeAsBytes(response.data);
+          print('File saved to $savePath');
+
+          setStatus(task, DownloadStatus.completed);
+          print('Download completed for URL: $url');
+        } else {
+          print(
+              'HTTP request failed with status: ${response.statusCode} for URL: $url');
+          setStatus(task, DownloadStatus.failed);
         }
       }
     } catch (e) {
+      print('An error occurred during download for URL: $url');
+      print('Error details: $e');
+
       var task = getDownload(url)!;
       if (task.status.value != DownloadStatus.canceled &&
           task.status.value != DownloadStatus.paused) {
+        print('Setting task status to failed for URL: $url');
         setStatus(task, DownloadStatus.failed);
-        runningTasks--;
 
+        runningTasks--;
         if (_queue.isNotEmpty) {
+          print('Starting the next task in the queue');
           _startExecution();
         }
         rethrow;
-      } else if (task.status.value == DownloadStatus.paused) {
-        final ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
-        final f = File(partialFilePath + tempExtension);
-        if (await f.exists()) {
-          await ioSink.addStream(f.openRead());
-        }
-        await ioSink.close();
       }
     }
 
     runningTasks--;
+    print('Running tasks decremented. Current running tasks: $runningTasks');
 
     if (_queue.isNotEmpty) {
+      print('Starting the next task in the queue');
       _startExecution();
     }
   }
@@ -146,60 +176,58 @@ class DownloadManager {
   }
 
   Future<DownloadTask?> addDownload(String url, String savedDir) async {
-    print("addDownload called with url: $url and savedDir: $savedDir");
+    if (url.isEmpty) {
+      return null;
+    }
 
-    if (url.isNotEmpty) {
+    if (kIsWeb) {
+      try {
+        FileSystemDirectoryHandle? root =
+            await html.window.navigator.storage?.getDirectory();
+        if (root == null) {
+          print("OPFS is not supported by this browser.");
+          return null;
+        }
+
+        String fileName = getFileNameFromUrl(url);
+
+        return _addDownloadRequest(DownloadRequest(url, fileName));
+      } catch (e) {
+        print("Error using OPFS: $e");
+        return null;
+      }
+    } else {
       if (savedDir.isEmpty) {
-        print("savedDir is empty, defaulting to '.'");
         savedDir = ".";
       }
 
       var isDirectory = await Directory(savedDir).exists();
-      print("Checked if $savedDir is a directory: $isDirectory");
-
       var downloadFilename = isDirectory
           ? savedDir + Platform.pathSeparator + getFileNameFromUrl(url)
           : savedDir;
-      print("Constructed download filename: $downloadFilename");
 
       return _addDownloadRequest(DownloadRequest(url, downloadFilename));
-    } else {
-      print("URL is empty. Returning null.");
-      return null;
     }
   }
 
   Future<DownloadTask> _addDownloadRequest(
       DownloadRequest downloadRequest) async {
-    print("_addDownloadRequest called with downloadRequest: $downloadRequest");
-
     if (_cache[downloadRequest.url] != null) {
-      print(
-          "Download request already exists in the cache for URL: ${downloadRequest.url}");
-
       if (!_cache[downloadRequest.url]!.status.value.isCompleted &&
           _cache[downloadRequest.url]!.request == downloadRequest) {
-        print(
-            "Existing download is in progress for the same request. Returning cached task.");
         return _cache[downloadRequest.url]!;
       } else {
-        print("Removing completed or mismatched request from queue.");
         _queue.remove(_cache[downloadRequest.url]);
       }
     }
 
-    print("Adding new download request to the queue: ${downloadRequest.url}");
     _queue.add(DownloadRequest(downloadRequest.url, downloadRequest.path));
 
     var task = DownloadTask(_queue.last);
-    print("Created new DownloadTask for URL: ${downloadRequest.url}");
 
     _cache[downloadRequest.url] = task;
-    print(
-        "Updated cache with the new DownloadTask for URL: ${downloadRequest.url}");
 
     _startExecution();
-    print("Execution started for queued downloads.");
 
     return task;
   }

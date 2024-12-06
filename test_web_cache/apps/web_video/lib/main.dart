@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const storagePath =
-        'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4';
+        'https://videos.pexels.com/video-files/6223250/6223250-hd_1920_1080_30fps.mp4';
     return MaterialApp(
       home: Scaffold(
           appBar: AppBar(

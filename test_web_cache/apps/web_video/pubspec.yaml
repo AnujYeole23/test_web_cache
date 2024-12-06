@@ -40,8 +40,7 @@ dependencies:
     path: ../../packages/storage_manager-main
     
   flutter_download_manager:
-    git:
-      url: https://github.com/simplecohesion/flutter_download_manager
+    path: ../../packages/flutter_download_manager
 
 dev_dependencies:
   flutter_test:
