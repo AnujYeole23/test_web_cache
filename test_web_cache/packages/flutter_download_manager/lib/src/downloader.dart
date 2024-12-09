@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
+
+
+import 'dart:js_interop';
 import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:universal_io/io.dart';
 import 'package:collection/collection.dart';
@@ -50,12 +52,11 @@ class DownloadManager {
 
   String extractFileName(String url) {
     final uri = Uri.parse(url);
-    return uri.pathSegments
-        .last; // Extracts the last part of the path, e.g., 'file_name.mp4'
+    return uri.pathSegments.last;
   }
 
   Future<void> download(String url, String savePath, CancelToken cancelToken,
-      {forceDownload = false}) async {
+      {bool forceDownload = false}) async {
     try {
       print('Download started for URL: $url');
 
@@ -73,63 +74,33 @@ class DownloadManager {
       setStatus(task, DownloadStatus.downloading);
       print('Download status set to downloading for URL: $url');
 
-      if (kIsWeb) {
-        print('Running web-specific download logic');
-        final response = await dio.get(
-          url,
-          options: Options(responseType: ResponseType.bytes),
-          cancelToken: cancelToken,
-        );
+      final response = await dio.get(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+        cancelToken: cancelToken,
+      );
 
-        if (response.statusCode == HttpStatus.ok) {
-          print('HTTP request succeeded for URL: $url');
-          // Convert file data to Base64
-          final base64Data = base64Encode(response.data);
-          print('File data encoded to Base64 for URL: $url');
-
-          // Create a downloadable data URL
-          final dataUrl = "data:application/octet-stream;base64,$base64Data";
-          final filename = extractFileName(url);
-          // Create an anchor element for downloading
-          final anchor = html.AnchorElement(href: dataUrl)
-            ..target = '_blank'
-            ..download = filename; 
-
-          html.document.body?.append(anchor);
-          print('Anchor element created and appended for URL: $url');
-          anchor.click();
-          print('Download triggered via anchor click for URL: $url');
-          anchor.remove();
-          print('Anchor element removed after click for URL: $url');
-
-          setStatus(task, DownloadStatus.completed);
-          print('Download completed for URL: $url');
-        } else {
-          print(
-              'HTTP request failed with status: ${response.statusCode} for URL: $url');
-          setStatus(task, DownloadStatus.failed);
-        }
+      if (response.statusCode == HttpStatus.ok) {
+        print('Received response data length: ${response.data.length}');
       } else {
-        print('Running non-web-specific download logic');
-        final response = await dio.get(
-          url,
-          options: Options(responseType: ResponseType.bytes),
-          cancelToken: cancelToken,
-        );
+        print('HTTP request failed with status: ${response.statusCode}');
+      }
 
-        if (response.statusCode == HttpStatus.ok) {
-          print('HTTP request succeeded for URL: $url');
-          final file = File(savePath);
-          await file.writeAsBytes(response.data);
-          print('File saved to $savePath');
+      if (response.statusCode == HttpStatus.ok) {
+        final filename = extractFileName(url);
 
-          setStatus(task, DownloadStatus.completed);
-          print('Download completed for URL: $url');
+        if (kIsWeb) {
+          await _downloadFileWeb(response.data, filename);
         } else {
-          print(
-              'HTTP request failed with status: ${response.statusCode} for URL: $url');
-          setStatus(task, DownloadStatus.failed);
+          await _downloadFileNative(response.data, savePath);
         }
+
+        setStatus(task, DownloadStatus.completed);
+        print('Download completed for URL: $url');
+      } else {
+        print(
+            'HTTP request failed with status: ${response.statusCode} for URL: $url');
+        setStatus(task, DownloadStatus.failed);
       }
     } catch (e) {
       print('An error occurred during download for URL: $url');
@@ -138,26 +109,48 @@ class DownloadManager {
       var task = getDownload(url)!;
       if (task.status.value != DownloadStatus.canceled &&
           task.status.value != DownloadStatus.paused) {
-        print('Setting task status to failed for URL: $url');
         setStatus(task, DownloadStatus.failed);
+      }
+      rethrow;
+    } finally {
+      runningTasks--;
+      print('Running tasks decremented. Current running tasks: $runningTasks');
 
-        runningTasks--;
-        if (_queue.isNotEmpty) {
-          print('Starting the next task in the queue');
-          _startExecution();
-        }
-        rethrow;
+      if (_queue.isNotEmpty) {
+        _startExecution();
       }
     }
+  }
 
-    runningTasks--;
-    print('Running tasks decremented. Current running tasks: $runningTasks');
+  Future<void> _downloadFileWeb(Uint8List data, String filename) async {
+    try {
+      print('Starting web download for $filename');
 
-    if (_queue.isNotEmpty) {
-      print('Starting the next task in the queue');
-      _startExecution();
+      final fileSystem = await html.window.navigator.storage?.getDirectory();
+      if (fileSystem != null) {
+        print('OPFS directory retrieved successfully');
+
+        final fileHandle =
+            await fileSystem.getFileHandle(filename, create: true);
+        print('File handle created for $filename');
+
+        final writable =
+            await fileHandle.createWritable() as FileSystemWritableFileStream;
+        print('Writable stream created');
+
+        await writable.write(data.toJS).toDart;
+        await writable.close().toDart;
+
+        print('File saved to OPFS as $filename');
+      } else {
+        print('OPFS is not supported or unavailable.');
+      }
+    } catch (e) {
+      print('Failed to download file using OPFS: $e');
     }
   }
+
+  _downloadFileNative(data, String savePath) {}
 
   void disposeNotifiers(DownloadTask task) {
     // task.status.dispose();
@@ -190,6 +183,7 @@ class DownloadManager {
         }
 
         String fileName = getFileNameFromUrl(url);
+
 
         return _addDownloadRequest(DownloadRequest(url, fileName));
       } catch (e) {
@@ -438,4 +432,16 @@ class DownloadManager {
   String getFileNameFromUrl(String url) {
     return url.split('/').last;
   }
+}
+
+/// This is a bridge to interact with the web's OPFS writable stream via JavaScript interop.
+///
+@JS()
+@staticInterop
+class FileSystemWritableFileStream {}
+
+extension FileSystemWritableFileStreamExtension
+    on FileSystemWritableFileStream {
+  external JSPromise write(JSAny data);
+  external JSPromise close();
 }
