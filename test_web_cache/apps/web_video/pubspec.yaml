@@ -41,6 +41,9 @@ dependencies:
     
   flutter_download_manager:
     path: ../../packages/flutter_download_manager
+  universal_io: ^2.2.2
+  file_system_access_api: ^2.0.0
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:

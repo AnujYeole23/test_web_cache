@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
-
-
 import 'dart:js_interop';
 import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:universal_io/io.dart';
 import 'package:collection/collection.dart';
 import 'dart:html' as html;
-import 'dart:typed_data'; // For working with Uint8List, if needed
-
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_download_manager/flutter_download_manager.dart';
@@ -58,21 +55,16 @@ class DownloadManager {
   Future<void> download(String url, String savePath, CancelToken cancelToken,
       {bool forceDownload = false}) async {
     try {
-      print('Download started for URL: $url');
-
       var task = getDownload(url);
       if (task == null) {
-        print('No download task found for URL: $url');
         return;
       }
 
       if (task.status.value == DownloadStatus.canceled) {
-        print('Download canceled for URL: $url');
         return;
       }
 
       setStatus(task, DownloadStatus.downloading);
-      print('Download status set to downloading for URL: $url');
 
       final response = await dio.get(
         url,
@@ -81,10 +73,7 @@ class DownloadManager {
       );
 
       if (response.statusCode == HttpStatus.ok) {
-        print('Received response data length: ${response.data.length}');
-      } else {
-        print('HTTP request failed with status: ${response.statusCode}');
-      }
+      } else {}
 
       if (response.statusCode == HttpStatus.ok) {
         final filename = extractFileName(url);
@@ -96,16 +85,10 @@ class DownloadManager {
         }
 
         setStatus(task, DownloadStatus.completed);
-        print('Download completed for URL: $url');
       } else {
-        print(
-            'HTTP request failed with status: ${response.statusCode} for URL: $url');
         setStatus(task, DownloadStatus.failed);
       }
     } catch (e) {
-      print('An error occurred during download for URL: $url');
-      print('Error details: $e');
-
       var task = getDownload(url)!;
       if (task.status.value != DownloadStatus.canceled &&
           task.status.value != DownloadStatus.paused) {
@@ -114,7 +97,6 @@ class DownloadManager {
       rethrow;
     } finally {
       runningTasks--;
-      print('Running tasks decremented. Current running tasks: $runningTasks');
 
       if (_queue.isNotEmpty) {
         _startExecution();
@@ -124,30 +106,18 @@ class DownloadManager {
 
   Future<void> _downloadFileWeb(Uint8List data, String filename) async {
     try {
-      print('Starting web download for $filename');
-
       final fileSystem = await html.window.navigator.storage?.getDirectory();
       if (fileSystem != null) {
-        print('OPFS directory retrieved successfully');
-
         final fileHandle =
             await fileSystem.getFileHandle(filename, create: true);
-        print('File handle created for $filename');
 
         final writable =
             await fileHandle.createWritable() as FileSystemWritableFileStream;
-        print('Writable stream created');
 
         await writable.write(data.toJS).toDart;
         await writable.close().toDart;
-
-        print('File saved to OPFS as $filename');
-      } else {
-        print('OPFS is not supported or unavailable.');
-      }
-    } catch (e) {
-      print('Failed to download file using OPFS: $e');
-    }
+      } else {}
+    } catch (e) {}
   }
 
   _downloadFileNative(data, String savePath) {}
@@ -178,16 +148,13 @@ class DownloadManager {
         FileSystemDirectoryHandle? root =
             await html.window.navigator.storage?.getDirectory();
         if (root == null) {
-          print("OPFS is not supported by this browser.");
           return null;
         }
 
         String fileName = getFileNameFromUrl(url);
 
-
         return _addDownloadRequest(DownloadRequest(url, fileName));
       } catch (e) {
-        print("Error using OPFS: $e");
         return null;
       }
     } else {
