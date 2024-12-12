@@ -53,19 +53,26 @@ class DownloadManager {
   }
 
   Future<void> download(String url, String savePath, CancelToken cancelToken,
-      {bool forceDownload = false}) async {
-    try {
-      var task = getDownload(url);
-      if (task == null) {
-        return;
-      }
+    {bool forceDownload = false}) async {
+  late String partialFilePath;
+  late File partialFile;
 
-      if (task.status.value == DownloadStatus.canceled) {
-        return;
-      }
+  try {
+    var task = getDownload(url);
 
-      setStatus(task, DownloadStatus.downloading);
+    if (task == null || task.status.value == DownloadStatus.canceled) {
+      return;
+    }
 
+    setStatus(task, DownloadStatus.downloading);
+
+    if (kDebugMode) {
+      print(url);
+    }
+
+    final filename = extractFileName(url);
+
+    if (kIsWeb) {
       final response = await dio.get(
         url,
         options: Options(responseType: ResponseType.bytes),
@@ -73,36 +80,84 @@ class DownloadManager {
       );
 
       if (response.statusCode == HttpStatus.ok) {
-      } else {}
-
-      if (response.statusCode == HttpStatus.ok) {
-        final filename = extractFileName(url);
-
-        if (kIsWeb) {
-          await _downloadFileWeb(response.data, filename);
-        } else {
-          await _downloadFileNative(response.data, savePath);
-        }
-
+        await _downloadFileWeb(response.data, filename);
         setStatus(task, DownloadStatus.completed);
       } else {
         setStatus(task, DownloadStatus.failed);
       }
-    } catch (e) {
-      var task = getDownload(url)!;
-      if (task.status.value != DownloadStatus.canceled &&
-          task.status.value != DownloadStatus.paused) {
-        setStatus(task, DownloadStatus.failed);
-      }
-      rethrow;
-    } finally {
-      runningTasks--;
+    } else {
+      partialFilePath = savePath + partialExtension;
+      partialFile = File(partialFilePath);
 
-      if (_queue.isNotEmpty) {
-        _startExecution();
+      var partialFileExist = await partialFile.exists();
+
+      if (partialFileExist) {
+        if (kDebugMode) {
+          print("Partial File Exists");
+        }
+
+        var partialFileLength = await partialFile.length();
+
+        var response = await dio.download(
+          url,
+          partialFilePath + tempExtension,
+          onReceiveProgress: createCallback(url, partialFileLength),
+          options: Options(
+            headers: {HttpHeaders.rangeHeader: 'bytes=$partialFileLength-'},
+          ),
+          cancelToken: cancelToken,
+          deleteOnError: true,
+        );
+
+        if (response.statusCode == HttpStatus.partialContent) {
+          var ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
+          var tempFile = File(partialFilePath + tempExtension);
+          await ioSink.addStream(tempFile.openRead());
+          await tempFile.delete();
+          await ioSink.close();
+          await partialFile.rename(savePath);
+
+          setStatus(task, DownloadStatus.completed);
+        }
+      } else {
+        var response = await dio.download(
+          url,
+          partialFilePath,
+          onReceiveProgress: createCallback(url, 0),
+          cancelToken: cancelToken,
+          deleteOnError: false,
+        );
+
+        if (response.statusCode == HttpStatus.ok) {
+          await partialFile.rename(savePath);
+          setStatus(task, DownloadStatus.completed);
+        } else {
+          setStatus(task, DownloadStatus.failed);
+        }
       }
     }
+  } catch (e) {
+    var task = getDownload(url)!;
+    if (task.status.value != DownloadStatus.canceled &&
+        task.status.value != DownloadStatus.paused) {
+      setStatus(task, DownloadStatus.failed);
+    } else if (task.status.value == DownloadStatus.paused) {
+      final ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
+      final tempFile = File(partialFilePath + tempExtension);
+      if (await tempFile.exists()) {
+        await ioSink.addStream(tempFile.openRead());
+      }
+      await ioSink.close();
+    }
+    rethrow;
+  } finally {
+    runningTasks--;
+
+    if (_queue.isNotEmpty) {
+      _startExecution();
+    }
   }
+}
 
   Future<void> _downloadFileWeb(Uint8List data, String filename) async {
     try {
@@ -120,7 +175,6 @@ class DownloadManager {
     } catch (e) {}
   }
 
-  _downloadFileNative(data, String savePath) {}
 
   void disposeNotifiers(DownloadTask task) {
     // task.status.dispose();
@@ -131,7 +185,6 @@ class DownloadManager {
     if (task != null) {
       task.status.value = status;
 
-      // tasks.add(task);
       if (status.isCompleted) {
         disposeNotifiers(task);
       }
