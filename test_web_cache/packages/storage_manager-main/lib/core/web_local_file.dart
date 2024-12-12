@@ -6,58 +6,61 @@ import 'package:storage_manager/core/local_file.dart';
 import 'package:universal_io/io.dart';
 
 class WebLocalFile implements LocalFile {
+  Future<FileSystemDirectoryHandle?> _getDirectoryHandle({String? directoryName}) async {
+    final directoryHandle = await html.window.navigator.storage?.getDirectory();
+    if (directoryHandle == null) {
+      throw UnsupportedError('File System Access API is not supported.');
+    }
+    if (directoryName != null) {
+      return directoryHandle.getDirectoryHandle(directoryName);
+    }
+    return directoryHandle;
+  }
+
+  Future<FileSystemFileHandle?> _getFileHandle(String localPath) async {
+    final parts = localPath.split('/');
+    final fileName = parts.last;
+    final directoryName = parts.length > 1 ? parts.first : null;
+
+    final directoryHandle = await _getDirectoryHandle(directoryName: directoryName);
+    if (directoryHandle == null) {
+      return null;
+    }
+    return directoryHandle.getFileHandle(fileName);
+  }
+
   @override
   Future<bool> fileExists(String localPath) async {
     try {
-      final parts = localPath.split('/');
-      final fileName = parts.last;
-      final directoryName = parts.length > 1 ? parts.first : null;
-
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
-      if (directoryHandle == null) {
-        return false;
-      }
-
-      FileSystemDirectoryHandle? subDirectoryHandle = directoryHandle;
-      if (directoryName != null) {
-        subDirectoryHandle = await directoryHandle.getDirectoryHandle(
-          directoryName,
-        );
-      }
-
-      await subDirectoryHandle.getFileHandle(fileName);
-
-      return true;
+      final fileHandle = await _getFileHandle(localPath);
+      return fileHandle != null;
     } on NotFoundError {
       return false;
     } catch (e) {
+      print('Error in fileExists: $e');
       return false;
     }
   }
 
   @override
-  Future<DateTime?> lastModified(String localPath) async {
-    try {
-
-     
-      final parts = localPath.split('/');
-      final directoryName = parts.length > 1 ? parts.first : null;
-
- 
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
-      if (directoryHandle == null) {
-        throw UnsupportedError('File System Access API is not supported.');
-      }
-
-
-      if (directoryName != null) {}
-    } catch (e) {
+Future<DateTime?> lastModified(String localPath) async {
+  try {
+    final fileHandle = await _getFileHandle(localPath);
+    if (fileHandle == null) {
       return null;
     }
+    final file = await fileHandle.getFile();
+    final lastModifiedTimestamp = file.lastModified;
+    if (lastModifiedTimestamp != null) {
+      return DateTime.fromMillisecondsSinceEpoch(lastModifiedTimestamp);
+    }
+    return null;
+  } catch (e) {
+    print('Error in lastModified: $e');
     return null;
   }
+}
+
 
   @override
   Future<String> getPath({
@@ -65,18 +68,10 @@ class WebLocalFile implements LocalFile {
     Directory? cacheDir,
   }) async {
     try {
-
       final fileName = storagePath.split('/').last;
-
-   
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
-
-      if (directoryHandle == null) {
-        throw UnsupportedError('File System Access API is not supported.');
-      }
       return fileName;
     } catch (e) {
+      print('Error in getPath: $e');
       return '';
     }
   }
@@ -84,9 +79,7 @@ class WebLocalFile implements LocalFile {
   @override
   Future<Directory> getDownloadDirectory(Directory cacheDir) async {
     try {
-      final directoryHandle =
-          await html.window.navigator.storage?.getDirectory();
-
+      final directoryHandle = await _getDirectoryHandle();
       if (directoryHandle == null) {
         throw UnsupportedError('File System Access API is not supported.');
       }
@@ -96,8 +89,10 @@ class WebLocalFile implements LocalFile {
         create: true,
       );
 
+
       return Directory(downloadDirHandle.name);
     } catch (e) {
+      print('Error in getDownloadDirectory: $e');
       rethrow;
     }
   }
