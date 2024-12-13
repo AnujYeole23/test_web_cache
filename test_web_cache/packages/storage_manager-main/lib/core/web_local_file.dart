@@ -1,38 +1,15 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:storage_manager/core/local_file.dart';
+import 'package:flutter_download_manager/src/opfs_helper.dart';
 import 'package:universal_io/io.dart';
 
 class WebLocalFile implements LocalFile {
-  Future<FileSystemDirectoryHandle?> _getDirectoryHandle({String? directoryName}) async {
-    final directoryHandle = await html.window.navigator.storage?.getDirectory();
-    if (directoryHandle == null) {
-      throw UnsupportedError('File System Access API is not supported.');
-    }
-    if (directoryName != null) {
-      return directoryHandle.getDirectoryHandle(directoryName);
-    }
-    return directoryHandle;
-  }
-
-  Future<FileSystemFileHandle?> _getFileHandle(String localPath) async {
-    final parts = localPath.split('/');
-    final fileName = parts.last;
-    final directoryName = parts.length > 1 ? parts.first : null;
-
-    final directoryHandle = await _getDirectoryHandle(directoryName: directoryName);
-    if (directoryHandle == null) {
-      return null;
-    }
-    return directoryHandle.getFileHandle(fileName);
-  }
-
+  final opfsHelper=OpfsHelper();
   @override
   Future<bool> fileExists(String localPath) async {
     try {
-      final fileHandle = await _getFileHandle(localPath);
+      final fileHandle = await opfsHelper.getFileHandle(localPath);
       return fileHandle != null;
     } on NotFoundError {
       return false;
@@ -45,7 +22,7 @@ class WebLocalFile implements LocalFile {
   @override
 Future<DateTime?> lastModified(String localPath) async {
   try {
-    final fileHandle = await _getFileHandle(localPath);
+    final fileHandle = await opfsHelper.getFileHandle(localPath);
     if (fileHandle == null) {
       return null;
     }
@@ -79,7 +56,7 @@ Future<DateTime?> lastModified(String localPath) async {
   @override
   Future<Directory> getDownloadDirectory(Directory cacheDir) async {
     try {
-      final directoryHandle = await _getDirectoryHandle();
+      final directoryHandle = await opfsHelper.getDirectoryHandle();
       if (directoryHandle == null) {
         throw UnsupportedError('File System Access API is not supported.');
       }

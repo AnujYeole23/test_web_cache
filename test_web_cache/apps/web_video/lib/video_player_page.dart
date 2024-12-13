@@ -2,10 +2,9 @@ import 'dart:async';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_download_manager/flutter_download_manager.dart';
 import 'package:universal_io/io.dart';
 import 'package:video_player/video_player.dart';
-import 'package:file_system_access_api/file_system_access_api.dart';
-import 'dart:html' as html;
 
 class AssessmentVideoPlayer extends StatefulWidget {
   const AssessmentVideoPlayer(
@@ -42,6 +41,7 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     if (isInitialising) {
       return;
     }
+
     if (isInitialised) {
       setState(() {
         isInitialised = false;
@@ -52,13 +52,15 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     isInitialising = true;
 
     if (kIsWeb) {
-      final videoUrl = await readFileFromOPFS(widget.videoResource);
+      final opfsHelper = OpfsHelper();
+      final videoUrl = await opfsHelper.readFileFromOPFS(widget.videoResource);
       if (videoUrl != null) {
-        controller = VideoPlayerController.asset(videoUrl);
+        controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
       }
     } else {
       controller = VideoPlayerController.file(File(widget.videoResource));
     }
+
     if (controller == null) {
       return;
     }
@@ -135,24 +137,5 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     return Chewie(
       controller: chewieController!,
     );
-  }
-
-  Future<String?> readFileFromOPFS(String filename) async {
-    try {
-      final fileSystem = await html.window.navigator.storage?.getDirectory();
-      if (fileSystem != null) {
-        final fileHandle = await fileSystem.getFileHandle(filename);
-
-        final file = await fileHandle.getFile();
-
-        final fileUrl = html.Url.createObjectUrlFromBlob(file);
-        print("File Url $fileUrl");
-        return fileUrl;
-      } else {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
   }
 }
