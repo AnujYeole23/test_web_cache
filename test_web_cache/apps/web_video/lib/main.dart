@@ -15,6 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const storagePath =
         'https://videos.pexels.com/video-files/6554025/6554025-uhd_2560_1440_24fps.mp4';
+    final opfsFileName=storagePath.split('/').last;
     final StreamController<double?> cursorStreamController =
         StreamController<double?>();
     return MaterialApp(
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
             builder: (context, snapshot) {
               return snapshot.status == StorageFileStatus.loading
                   ? const CircularProgressIndicator()
-                  : AssessmentVideoPlayer(snapshot.filePath!,
+                  : AssessmentVideoPlayer(snapshot.filePath??opfsFileName,
                       cursorStreamController: cursorStreamController);
             },
             updateDate: (DateTime.now()),
