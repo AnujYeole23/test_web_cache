@@ -22,7 +22,7 @@ class DownloadManager {
   int maxConcurrentTasks = 2;
   int runningTasks = 0;
 
-  static final DownloadManager _dm = new DownloadManager._internal();
+  static final DownloadManager _dm = DownloadManager._internal();
 
   DownloadManager._internal();
 
