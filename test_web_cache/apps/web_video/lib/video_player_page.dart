@@ -1,20 +1,20 @@
 import 'dart:async';
 import 'package:chewie/chewie.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_download_manager/flutter_download_manager.dart';
 import 'package:universal_io/io.dart';
 import 'package:video_player/video_player.dart';
+import 'dart:html' as html;
 
 class AssessmentVideoPlayer extends StatefulWidget {
   const AssessmentVideoPlayer(
     this.videoResource, {
-    required this.cursorStreamController,
+    this.cursorStreamController,
     super.key,
   });
 
   final String videoResource;
-  final StreamController<double?> cursorStreamController;
+  final StreamController<double?>? cursorStreamController;
 
   @override
   State<StatefulWidget> createState() => _AssessmentVideoState();
@@ -50,20 +50,14 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     }
 
     isInitialising = true;
+    debugPrint('the Video Resourse is : ${widget.videoResource}');
 
-    if (kIsWeb) {
-      final opfsHelper = OpfsHelper();
-      final videoUrl = await opfsHelper.readFileFromOPFS(widget.videoResource);
-      if (videoUrl != null) {
-        controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-      }
-    } else {
-      controller = VideoPlayerController.file(File(widget.videoResource));
-    }
 
-    if (controller == null) {
-      return;
-    }
+    controller = widget.videoResource.startsWith('https') ||
+            widget.videoResource.startsWith('blob')
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.videoResource))
+        : VideoPlayerController.file(File(widget.videoResource));
+
 
     await controller?.setLooping(true);
     await controller?.initialize();
@@ -86,7 +80,7 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
         return;
       }
       _lastPosition = position;
-      widget.cursorStreamController.add(
+      widget.cursorStreamController?.add(
         position.inMilliseconds.toDouble() / 1000,
       );
     });
@@ -129,7 +123,7 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     if (!isInitialised) {
-      return const Text('Loading Screen ***********');
+      return const Center(child: CircularProgressIndicator());
     }
     if (chewieController == null) {
       return const SizedBox();
@@ -139,3 +133,4 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     );
   }
 }
+
