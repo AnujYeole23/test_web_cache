@@ -32,10 +32,9 @@ class MyApp extends StatelessWidget {
               }
               return snapshot.status == StorageFileStatus.loading
                   ? const CircularProgressIndicator()
-                  : AssessmentVideoPlayer(opfsFileName,
+                  : AssessmentVideoPlayer(snapshot.filePath!,
                       cursorStreamController: cursorStreamController);
             },
-            updateDate: (DateTime.now()),
           ),
         ),
       ),
