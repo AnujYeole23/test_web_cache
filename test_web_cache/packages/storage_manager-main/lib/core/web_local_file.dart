@@ -1,8 +1,7 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:storage_manager/core/local_file.dart';
+
 import 'package:storage_manager/storage_manager.dart';
 import 'package:universal_io/io.dart';
 
@@ -13,6 +12,7 @@ class WebLocalFile implements LocalFile {
   Future<bool> fileExists(String localPath) async {
     try {
       final fileHandle = await OpfsHelper.getFileHandle(localPath);
+
       return fileHandle != null;
     } on NotFoundError {
       return false;
@@ -25,7 +25,9 @@ class WebLocalFile implements LocalFile {
   @override
 Future<DateTime?> lastModified(String localPath) async {
   try {
+
     final fileHandle = await OpfsHelper.getFileHandle(localPath);
+
     if (fileHandle == null) {
       return null;
     }
@@ -59,7 +61,9 @@ Future<DateTime?> lastModified(String localPath) async {
   @override
   Future<Directory> getDownloadDirectory(Directory cacheDir) async {
     try {
+
       final directoryHandle = await OpfsHelper.getDirectoryHandle();
+
       if (directoryHandle == null) {
         throw UnsupportedError('File System Access API is not supported.');
       }

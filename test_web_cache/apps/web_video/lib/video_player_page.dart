@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_download_manager/flutter_download_manager.dart';
 import 'package:universal_io/io.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:html' as html;
@@ -40,6 +41,7 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     if (isInitialising) {
       return;
     }
+
     if (isInitialised) {
       setState(() {
         isInitialised = false;
@@ -50,10 +52,12 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     isInitialising = true;
     debugPrint('the Video Resourse is : ${widget.videoResource}');
 
+
     controller = widget.videoResource.startsWith('https') ||
             widget.videoResource.startsWith('blob')
         ? VideoPlayerController.networkUrl(Uri.parse(widget.videoResource))
         : VideoPlayerController.file(File(widget.videoResource));
+
 
     await controller?.setLooping(true);
     await controller?.initialize();
@@ -129,3 +133,4 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     );
   }
 }
+

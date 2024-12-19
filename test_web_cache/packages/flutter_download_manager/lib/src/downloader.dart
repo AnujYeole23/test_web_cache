@@ -1,11 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:js_interop';
-import 'package:file_system_access_api/file_system_access_api.dart';
 import 'package:universal_io/io.dart';
 import 'package:collection/collection.dart';
-import 'dart:html' as html;
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_download_manager/flutter_download_manager.dart';
@@ -53,128 +49,118 @@ class DownloadManager {
   }
 
   Future<void> download(String url, String savePath, CancelToken cancelToken,
-    {bool forceDownload = false}) async {
-  late String partialFilePath;
-  late File partialFile;
+      {bool forceDownload = false}) async {
+    late String partialFilePath;
+    late File partialFile;
 
-  try {
-    var task = getDownload(url);
+    try {
+      var task = getDownload(url);
 
-    if (task == null || task.status.value == DownloadStatus.canceled) {
-      return;
-    }
-
-    setStatus(task, DownloadStatus.downloading);
-
-    if (kDebugMode) {
-      print(url);
-    }
-
-    final filename = extractFileName(url);
-
-    if (kIsWeb) {
-      final response = await dio.get(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-        cancelToken: cancelToken,
-      );
-
-      if (response.statusCode == HttpStatus.ok) {
-        await _downloadFileWeb(response.data, filename);
-        setStatus(task, DownloadStatus.completed);
-      } else {
-        setStatus(task, DownloadStatus.failed);
+      if (task == null || task.status.value == DownloadStatus.canceled) {
+        return;
       }
-    } else {
-      partialFilePath = savePath + partialExtension;
-      partialFile = File(partialFilePath);
 
-      var partialFileExist = await partialFile.exists();
+      setStatus(task, DownloadStatus.downloading);
 
-      if (partialFileExist) {
-        if (kDebugMode) {
-          print("Partial File Exists");
-        }
+      if (kDebugMode) {
+        print(url);
+      }
 
-        var partialFileLength = await partialFile.length();
+      final filename = extractFileName(url);
 
-        var response = await dio.download(
+      if (kIsWeb) {
+        final response = await dio.get(
           url,
-          partialFilePath + tempExtension,
-          onReceiveProgress: createCallback(url, partialFileLength),
-          options: Options(
-            headers: {HttpHeaders.rangeHeader: 'bytes=$partialFileLength-'},
-          ),
+          options: Options(responseType: ResponseType.bytes),
           cancelToken: cancelToken,
-          deleteOnError: true,
-        );
-
-        if (response.statusCode == HttpStatus.partialContent) {
-          var ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
-          var tempFile = File(partialFilePath + tempExtension);
-          await ioSink.addStream(tempFile.openRead());
-          await tempFile.delete();
-          await ioSink.close();
-          await partialFile.rename(savePath);
-
-          setStatus(task, DownloadStatus.completed);
-        }
-      } else {
-        var response = await dio.download(
-          url,
-          partialFilePath,
-          onReceiveProgress: createCallback(url, 0),
-          cancelToken: cancelToken,
-          deleteOnError: false,
         );
 
         if (response.statusCode == HttpStatus.ok) {
-          await partialFile.rename(savePath);
+          await _downloadFileWeb(response.data, filename);
           setStatus(task, DownloadStatus.completed);
         } else {
           setStatus(task, DownloadStatus.failed);
         }
-      }
-    }
-  } catch (e) {
-    var task = getDownload(url)!;
-    if (task.status.value != DownloadStatus.canceled &&
-        task.status.value != DownloadStatus.paused) {
-      setStatus(task, DownloadStatus.failed);
-    } else if (task.status.value == DownloadStatus.paused) {
-      final ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
-      final tempFile = File(partialFilePath + tempExtension);
-      if (await tempFile.exists()) {
-        await ioSink.addStream(tempFile.openRead());
-      }
-      await ioSink.close();
-    }
-    rethrow;
-  } finally {
-    runningTasks--;
+      } else {
+        partialFilePath = savePath + partialExtension;
+        partialFile = File(partialFilePath);
 
-    if (_queue.isNotEmpty) {
-      _startExecution();
+        var partialFileExist = await partialFile.exists();
+
+        if (partialFileExist) {
+          if (kDebugMode) {
+            print("Partial File Exists");
+          }
+
+          var partialFileLength = await partialFile.length();
+
+          var response = await dio.download(
+            url,
+            partialFilePath + tempExtension,
+            onReceiveProgress: createCallback(url, partialFileLength),
+            options: Options(
+              headers: {HttpHeaders.rangeHeader: 'bytes=$partialFileLength-'},
+            ),
+            cancelToken: cancelToken,
+            deleteOnError: true,
+          );
+
+          if (response.statusCode == HttpStatus.partialContent) {
+            var ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
+            var tempFile = File(partialFilePath + tempExtension);
+            await ioSink.addStream(tempFile.openRead());
+            await tempFile.delete();
+            await ioSink.close();
+            await partialFile.rename(savePath);
+
+            setStatus(task, DownloadStatus.completed);
+          }
+        } else {
+          var response = await dio.download(
+            url,
+            partialFilePath,
+            onReceiveProgress: createCallback(url, 0),
+            cancelToken: cancelToken,
+            deleteOnError: false,
+          );
+
+          if (response.statusCode == HttpStatus.ok) {
+            await partialFile.rename(savePath);
+            setStatus(task, DownloadStatus.completed);
+          } else {
+            setStatus(task, DownloadStatus.failed);
+          }
+        }
+      }
+    } catch (e) {
+      var task = getDownload(url)!;
+      if (task.status.value != DownloadStatus.canceled &&
+          task.status.value != DownloadStatus.paused) {
+        setStatus(task, DownloadStatus.failed);
+      } else if (task.status.value == DownloadStatus.paused) {
+        final ioSink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
+        final tempFile = File(partialFilePath + tempExtension);
+        if (await tempFile.exists()) {
+          await ioSink.addStream(tempFile.openRead());
+        }
+        await ioSink.close();
+      }
+      rethrow;
+    } finally {
+      runningTasks--;
+
+      if (_queue.isNotEmpty) {
+        _startExecution();
+      }
     }
   }
-}
 
   Future<void> _downloadFileWeb(Uint8List data, String filename) async {
     try {
-      final fileSystem = await html.window.navigator.storage?.getDirectory();
-      if (fileSystem != null) {
-        final fileHandle =
-            await fileSystem.getFileHandle(filename, create: true);
-
-        final writable =
-            await fileHandle.createWritable() as FileSystemWritableFileStream;
-
-        await writable.write(data.toJS).toDart;
-        await writable.close().toDart;
-      } else {}
+      final opfsHelper = OpfsHelper();
+      await opfsHelper.writeFile(data, filename);
     } catch (e) {}
   }
-
 
   void disposeNotifiers(DownloadTask task) {
     // task.status.dispose();
@@ -198,12 +184,6 @@ class DownloadManager {
 
     if (kIsWeb) {
       try {
-        FileSystemDirectoryHandle? root =
-            await html.window.navigator.storage?.getDirectory();
-        if (root == null) {
-          return null;
-        }
-
         String fileName = getFileNameFromUrl(url);
 
         return _addDownloadRequest(DownloadRequest(url, fileName));
@@ -444,7 +424,7 @@ class DownloadManager {
       download(
           currentRequest.url, currentRequest.path, currentRequest.cancelToken);
 
-      await Future.delayed(Duration(milliseconds: 500), null);
+      await Future.delayed(const Duration(milliseconds: 500), null);
     }
   }
 
@@ -452,16 +432,4 @@ class DownloadManager {
   String getFileNameFromUrl(String url) {
     return url.split('/').last;
   }
-}
-
-/// This is a bridge to interact with the web's OPFS writable stream via JavaScript interop.
-///
-@JS()
-@staticInterop
-class FileSystemWritableFileStream {}
-
-extension FileSystemWritableFileStreamExtension
-    on FileSystemWritableFileStream {
-  external JSPromise write(JSAny data);
-  external JSPromise close();
 }
