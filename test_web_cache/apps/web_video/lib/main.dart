@@ -31,7 +31,6 @@ class MyApp extends StatelessWidget {
                   : AssessmentVideoPlayer(snapshot.filePath!,
                       cursorStreamController: cursorStreamController);
             },
-            updateDate: (DateTime.now()),
           ),
         ),
       ),

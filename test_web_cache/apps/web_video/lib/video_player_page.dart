@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'package:chewie/chewie.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:universal_io/io.dart';
 import 'package:video_player/video_player.dart';
-import 'package:file_system_access_api/file_system_access_api.dart';
-import 'dart:html' as html;
+
 
 class AssessmentVideoPlayer extends StatefulWidget {
   const AssessmentVideoPlayer(
@@ -50,18 +48,12 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     }
 
     isInitialising = true;
+    debugPrint('the Video Resourse is : ${widget.videoResource}');
 
-    if (kIsWeb) {
-      final videoUrl = await readFileFromOPFS(widget.videoResource);
-      if (videoUrl != null) {
-        controller = VideoPlayerController.asset(videoUrl);
-      }
-    } else {
-      controller = VideoPlayerController.file(File(widget.videoResource));
-    }
-    if (controller == null) {
-      return;
-    }
+    controller = widget.videoResource.startsWith('https') ||
+            widget.videoResource.startsWith('blob')
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.videoResource))
+        : VideoPlayerController.file(File(widget.videoResource));
 
     await controller?.setLooping(true);
     await controller?.initialize();
@@ -127,7 +119,7 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     if (!isInitialised) {
-      return const Text('Loading Screen ***********');
+      return const Center(child: CircularProgressIndicator());
     }
     if (chewieController == null) {
       return const SizedBox();
@@ -135,24 +127,5 @@ class _AssessmentVideoState extends State<AssessmentVideoPlayer> {
     return Chewie(
       controller: chewieController!,
     );
-  }
-
-  Future<String?> readFileFromOPFS(String filename) async {
-    try {
-      final fileSystem = await html.window.navigator.storage?.getDirectory();
-      if (fileSystem != null) {
-        final fileHandle = await fileSystem.getFileHandle(filename);
-
-        final file = await fileHandle.getFile();
-
-        final fileUrl = html.Url.createObjectUrlFromBlob(file);
-        print("File Url $fileUrl");
-        return fileUrl;
-      } else {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
   }
 }
