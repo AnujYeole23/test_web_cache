@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const storagePath =
-        'https://videos.pexels.com/video-files/6554025/6554025-uhd_2560_1440_24fps.mp4';
+    'https://videos.pexels.com/video-files/29713297/12776318_2560_1440_30fps.mp4';
     final StreamController<double?> cursorStreamController =
         StreamController<double?>();
     return MaterialApp(
@@ -24,14 +24,20 @@ class MyApp extends StatelessWidget {
             title: const Text('Video Player Demo'),
           ),
           body: StorageFileBuilder(
-            storagePath: storagePath,
-            builder: (context, snapshot) {
-              return snapshot.status == StorageFileStatus.loading
-                  ? const CircularProgressIndicator()
-                  : AssessmentVideoPlayer(snapshot.filePath!,
-                      cursorStreamController: cursorStreamController);
-            },
-          ),
+                storagePath: storagePath,
+                builder: (context, snapshot) {
+                  if (snapshot.status == StorageFileStatus.loading) {
+                    return const  CircularProgressIndicator();
+                  }
+                  if (snapshot.status == StorageFileStatus.success) {
+                    return AssessmentVideoPlayer(
+                      snapshot.filePath!,
+                      cursorStreamController: cursorStreamController,
+                    );
+                  }
+                  return const Text('Error!');
+                },updateDate: DateTime(2024, 1, 1),
+              ),
         ),
       ),
     );

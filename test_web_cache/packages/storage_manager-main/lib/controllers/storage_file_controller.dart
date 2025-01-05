@@ -1,10 +1,7 @@
 import 'package:firebase_storage/firebase_storage.dart' show FirebaseException;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_download_manager/flutter_download_manager.dart';
-import 'package:storage_manager/core/file_downloader.dart';
 import 'package:storage_manager/core/local_file.dart';
-import 'package:storage_manager/enums/storage_file_status.dart';
-import 'package:storage_manager/models/storage_file_snapshot.dart';
 import 'package:storage_manager/storage_manager.dart';
 import 'package:universal_io/io.dart';
 
@@ -38,11 +35,13 @@ class StorageFileController {
       if (_isDisposed) return;
 
       // Get the filepath to the local cache
-      final filePath =
-          await LocalFile.instance.getPath(storagePath: storagePath, cacheDir: cacheDir);
+      final filePath = await LocalFile.instance
+          .getPath(storagePath: storagePath, cacheDir: cacheDir);
 
       // Check if the file exists
       final fileExists = await LocalFile.instance.fileExists(filePath);
+
+      debugPrint('checking if the file exists $fileExists');
 
       // Check if the file needs to be updated (redownloaded)
       // By comparing the supplied update date to the last modified date of
@@ -61,7 +60,8 @@ class StorageFileController {
       // to the local cached file
       if (fileExists && !needsUpdate) {
         snapshot = snapshot.copyWith(
-          filePath: kIsWeb?await OpfsHelper.readFileFromOPFS(filePath):filePath,
+          filePath:
+              kIsWeb ? await OpfsHelper.readFileFromOPFS(filePath) : filePath,
           status: StorageFileStatus.success,
         );
         onSnapshotChanged(snapshot);
@@ -72,6 +72,8 @@ class StorageFileController {
       // and cache it
 
       if (_isDisposed) return;
+
+      debugPrint('File Does not exists , Going to Download it ');
 
       // Get the download task
       _downloadTask = await FileDownloader.downloadFile(
@@ -114,7 +116,7 @@ class StorageFileController {
     onSnapshotChanged(snapshot);
   }
 
-  void statusUpdated() {
+  Future<void> statusUpdated() async {
     if (_isDisposed) return;
 
     final task = _downloadTask;
@@ -123,11 +125,16 @@ class StorageFileController {
     final status = task.status;
 
     if (status.value == DownloadStatus.completed) {
+      final downloadedFilePath = kIsWeb
+          ? await OpfsHelper.readFileFromOPFS(task.request.path)
+          : task.request.path;
+
       snapshot = snapshot.copyWith(
-        filePath: task.request.path,
+        filePath: downloadedFilePath,
         status: StorageFileStatus.success,
       );
       onSnapshotChanged(snapshot);
+      debugPrint('Status Completed ------------ $downloadedFilePath');
     }
 
     if (status.value == DownloadStatus.downloading) {
